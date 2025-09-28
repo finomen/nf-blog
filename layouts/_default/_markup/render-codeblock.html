@@ -1,0 +1,16 @@
+{{ $lang := .Type | default "text" }}
+{{ $filename := .Attributes.filename | default .Attributes.title }}
+
+<div class="code-block-wrapper">
+  {{ if $filename }}
+  <div class="code-filename">
+    <span class="filename-text">{{ $filename }}</span>
+  </div>
+  {{ end }}
+
+  {{ if transform.CanHighlight $lang }}
+    {{ highlight .Inner $lang .Options }}
+  {{ else }}
+    <pre><code{{ with $lang }} class="language-{{ . }}"{{ end }}>{{ .Inner }}</code></pre>
+  {{ end }}
+</div>

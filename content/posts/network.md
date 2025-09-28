@@ -59,7 +59,7 @@ gcloud auth application-default login
 
 Next, create a `main.tf` file with required providers and backend:
 
-```terraform
+```terraform {filename=main.tf}
 terraform {
   required_version = ">= 1.9.0"
 
@@ -78,7 +78,7 @@ terraform {
 
 And a `variables.tf` file with required input variables:
 
-```terraform
+```terraform {fielname=variables.tf}
 variable "state_bucket" {
   type = string
   description = "Bucket to store state"
@@ -97,7 +97,7 @@ variable "google_project" {
 
 Variables can be passed via command line or with an `all.auto.tfvars` file:
 
-```terraform
+```terraform {filename=all.auto.tfvars}
 google_project = "<redacted>"
 state_bucket = "<redacted>"
 state_bucket_prefix = "infra/state"
@@ -124,8 +124,7 @@ Before applying OpenTofu configuration, the MikroTik devices need initial prepar
 
 First, we'll define our managed and unmanaged devices. Managed devices will have Terraform users created with automatically generated passwords, while unmanaged devices are tracked for static DHCP leases and documentation purposes.
 
-**managed-devices.tf**
-```terraform
+```terraform {filename=managed-devices.tf}
 locals {
   managed-devices = {
     edge = {
@@ -142,8 +141,7 @@ locals {
 }
 ```
 
-**unmanaged-devices.tf**
-```terraform
+```terraform {filename=unmanaged-devices.tf}
 locals {
   unmanaged-devices = {
     lan-wifi = {
@@ -169,8 +167,7 @@ Next, we'll define our desired VLANs. This segmented approach provides network i
 | 30   | iot      | 192.168.30.0/24 | Network for IoT devices                                   |
 | 100  | cluster  | 10.100.0.0/24   | Network for Kubernetes cluster nodes                     |
 
-**vlans.tf**
-```terraform
+```terraform {filename=vlans.tf}
 locals {
   vlans = {
     mgmt = {
@@ -201,8 +198,7 @@ locals {
 
 Next, we'll define our Kubernetes cluster nodes with their MAC addresses and IP assignments for consistent network identification:
 
-**cluster.tf**
-```terraform
+```terraform {filename=cluster.tf}
 locals {
   cluster-nodes = {
     node-1 : {
@@ -227,8 +223,8 @@ locals {
 #### WiFi Configuration
 
 Finally, we'll configure WiFi networks for IoT devices using CAPsMAN (Controlled Access Point system MANager):
-**wifi-capsman.tf**
-```terraform
+
+```terraform {filename=wifi-capsman.tf}
 locals {
   wifi-capsman = {
     <redacted> = {
@@ -258,19 +254,19 @@ locals {
 For managed devices, Terraform users will be created with passwords stored in Google Secret Manager.
 
 To do this, we need one more input variable in `variables.tf`:
-```terraform
+```terraform {filename=variables.tf}
 variable "google_project" {
   type = string
   description = "Google project to use"
 }
 ```
 And value in `all.auto.tfvars`
-```terraform
+```terraform {filename=all.auto.tfvars}
 google_project = "<redacted>"
 ```
 
 And one more provider in `main.tf` to generate random passwords:
-```terraform
+```terraform {filename=main.tf}
     random = {
       source  = "hashicorp/random"
     }
@@ -279,7 +275,8 @@ And one more provider in `main.tf` to generate random passwords:
 #### secrets.tf
 
 This section handles the creation and storage of sensitive configuration data. First, we'll create random passwords for every managed device:
-```terraform
+
+```terraform {filename=secrets.tf}
 resource "random_password" "device_password" {
   length = 32
   special = false
@@ -288,7 +285,7 @@ resource "random_password" "device_password" {
 ```
 
 Next, we'll save all passwords in Google Secret Manager using JSON format for efficient storage within the free tier limits:
-```terraform
+```terraform {filename=secrets.tf}
 resource "google_secret_manager_secret" "device-accounts" {
   secret_id = "tf_device-accounts"
   project = var.google_project
@@ -311,7 +308,7 @@ This is not the best way to store secrets, but allows to stay in free tier. Unfo
 TODO: use secret_data_wo when possible
 
 For future use in providers define decoded version
-```terraform
+```terraform {filename=secrets.tf}
 locals {
   _device-accounts-decoded = jsondecode(google_secret_manager_secret_version.device-accounts.secret_data)
   device-accounts = {for k, v in local.managed-devices: k=> {
@@ -323,8 +320,7 @@ locals {
 
 We'll repeat the same process for Wi-Fi passwords:
 
-```terraform
-
+```terraform {filename=secrets.tf}
 resource "random_password" "wifi_password" {
   length = 32
   special = true
@@ -360,8 +356,7 @@ locals {
 
 The edge router serves as our network gateway, handling internet connectivity, VLAN routing, DHCP services, firewall rules, and wireless management through CAPsMAN. Let's create an `edge-router` module to organize this complex configuration:
 
-**main.tf**
-```terraform
+```terraform {filename=main.tf}
 module "edge-router" {
   source = "./edge-router"
   hosturl = var.edge_router_url
@@ -403,7 +398,7 @@ module "edge-router" {
 ```
 
 And add provider to main.tf
-```terraform
+```terraform {filename=main.tf}
     routeros = {
       source = "terraform-routeros/routeros"
     }
@@ -413,8 +408,7 @@ And add provider to main.tf
 
 This module contains all the configuration for our primary network gateway, implementing VLANs, bridge configuration, DHCP services, wireless management, and security policies.
 
-**edge.tf**
-```terraform
+```terraform {filename=edge.tf}
 terraform {
   required_providers {
     routeros = {
@@ -424,8 +418,7 @@ terraform {
 }
 ```
 
-**input.tf**
-```terraform
+```terraform {filename=input.tf}
 variable "vlans" {
   type = map(object({
     vlan_id = number,
@@ -464,8 +457,7 @@ variable "capsman_psk" {
 
 And one file that will be shared with `lan-wired-sw` (copy-paste)
 
-**tf-account.tf**
-```terraform
+```terraform {filename=tf-account.tf}
 variable "account" {
   type = object({
     username = string,
@@ -504,8 +496,7 @@ Now we will be able to use our created account for edge-router.
 
 First, let's create our VLANs on the bridge interface:
 
-**vlans.tf**
-```terraform
+```terraform {filename=vlans.tf}
 locals {
   vlans = {
     mgmt = 10,
@@ -528,8 +519,8 @@ resource "routeros_interface_vlan" "vlan" {
 #### Bridge and Port Configuration
 
 Now we'll set up the bridge interface and configure individual ports. The bridge enables VLAN switching and connects all network segments. Each port is configured with appropriate VLAN tagging based on its purpose:
-**bridge.tf**
-```terraform
+
+```terraform {filename=bridge.tf}
 locals {
   bridge_ports = {
     ether1 = {
@@ -624,8 +615,8 @@ resource "routeros_interface_bridge_vlan" "bridge-vlan" {
 #### Uplink Configuration
 
 The uplink configuration handles our internet connection through the WAN interface, including DHCP client setup for IPv4 and IPv6, NAT configuration, and interface lists for firewall rules:
-**uplink.tf**
-```terraform
+
+```terraform {filename=uplink.tf}
 resource "routeros_interface_ethernet" "wan" {
   factory_name = "sfp-sfpplus4"
   name         = "wan"
@@ -681,8 +672,7 @@ Since there is no firewall configured yet, it's better to keep uplink cable unpl
 
 Now we'll configure DHCP services and IP addressing for each VLAN. Since there are many resources to configure for every network (IP addresses, DHCP pools, servers, and IPv6 settings), we'll create a reusable module and apply it to all VLANs:
 
-**dhcp-nets.tf**
-```terraform
+```terraform {filename=dhcp-nets.tf}
 module "mikrotik-dhcp-net" {
   source = "../mikrotik-dhcp-net"
 
@@ -702,8 +692,8 @@ module "mikrotik-dhcp-net" {
 ```
 
 With DHCP networks configured, we can now add static leases for known devices to ensure consistent IP assignments:
-**dhcp-static.tf**
-```terraform
+
+```terraform {filename=dhcp-static.tf}
 resource "routeros_dhcp_server_lease" "static-lease" {
   for_each = var.static-leases
   address     = each.value.address
@@ -715,8 +705,8 @@ resource "routeros_dhcp_server_lease" "static-lease" {
 #### NTP Configuration
 
 To maintain accurate time synchronization across the network (essential for logs, certificates, and security), we'll configure an NTP client:
-**ntp.tf**
-```terraform
+
+```terraform {filename=ntp.tf}
 resource "routeros_system_ntp_client" "ntp" {
   servers = [
     "pool.ntp.org",
@@ -733,8 +723,7 @@ resource "routeros_system_ntp_client" "ntp" {
 
 CAPsMAN (Controlled Access Point system MANager) provides centralized wireless management for our MikroTik access points. First, we need to set up certificates for secure communication between the controller and access points:
 
-**cert.tf**
-```terraform
+```terraform {filename=cert.tf}
 resource "routeros_system_certificate" "edge-ca" {
   name        = "edge-ca"
   common_name = "edge-ca"
@@ -751,8 +740,7 @@ resource "routeros_system_certificate_scep_server" "edge-ca" {
 
 With certificates in place, we can now configure the CAPsMAN controller, wireless channels, security profiles, and provisioning rules:
 
-**capsman.tf**
-```terraform
+```terraform {filename=capsman.tf}
 locals {
   capsman-ip = cidrhost(var.vlans["mgmt"].network, 1)
 }
@@ -850,8 +838,7 @@ resource "routeros_capsman_manager_interface" "bridge" {
 
 Now we'll configure a basic but secure firewall ruleset. This includes allowing established connections, dropping invalid packets, accepting ICMP for network troubleshooting, and implementing proper NAT for internet access while blocking unwanted inbound traffic:
 
-**firewall.tf**
-```terraform
+```terraform {filename=firewall.tf}
 resource "routeros_interface_list" "all-local" {
   name = "ALL_LOCAL"
 }
@@ -947,8 +934,7 @@ resource "routeros_ip_firewall_filter" "drop_all_wan_not_dstnat" {
 
 We'll also configure similar rules for IPv6 traffic:
 
-**firewallv6.tf**
-```terraform
+```terraform {filename=firewallv6.tf}
 resource "routeros_ipv6_firewall_filter" "accept_established_related_untracked" {
   action           = "accept"
   chain            = "input"
@@ -1000,8 +986,7 @@ resource "routeros_ipv6_firewall_filter" "drop_invalid_forward" {
 
 This reusable module handles the complete network setup for a VLAN, including IP addressing, DHCP pool creation, server configuration, and IPv6 setup. It standardizes network configuration across all VLANs:
 
-**input.tf**
-```terraform
+```terraform {filename=input.tf}
 variable "interface" {
   type = string
   description = "Interface name"
@@ -1036,8 +1021,7 @@ variable "comment" {
 ```
 
 And main body of module
-**mikrotik-dhcp-net.tf**
-```terraform
+```terraform {filename=mikrotik-dhcp-net.tf}
 terraform {
   required_providers {
     routeros = {
@@ -1095,8 +1079,7 @@ resource "routeros_ipv6_address" "addr-v6" {
 
 Now we can configure our second MikroTik device, which serves as a managed access point and provides additional wired ports for the LAN. This device connects to the edge router via trunk and provides both wireless and wired access:
 
-**main.tf**
-```terraform
+```terraform {filename=main.tf}
 module "lan-wired-sw" {
   source = "./lan-wired-sw"
   capsman = module.edge-router.capsman-ip
@@ -1115,8 +1098,7 @@ This module configures the secondary MikroTik device as a managed switch and wir
 
 Next, we'll configure basic network services including DNS forwarding, IPv6 settings, and DHCP client for management connectivity:
 
-**lan-wired-sw.tf**
-```terraform
+```terraform {filename=lan-wired-sw.tf}
 terraform {
   required_providers {
     routeros = {
@@ -1126,8 +1108,7 @@ terraform {
 }
 ```
 
-**input.tf**
-```terraform
+```terraform {filename=input.tf}
 variable "capsman" {
   type = string
   description = "Capsman address"
@@ -1140,8 +1121,7 @@ First, use the same steps and `tf-account.tf` file.
 
 First, we'll configure the bridge and port assignments. This device acts as a VLAN-aware switch, with most ports providing untagged LAN access while the uplink carries multiple VLANs:
 
-**bridge.tf**
-```terraform
+```terraform {filename=bridge.tf}
 locals {
   bridge_ports = {
     ether1 = {
@@ -1228,8 +1208,7 @@ resource "routeros_interface_bridge_vlan" "bridge-vlan" {
 }
 ```
 
-**lan-wired-sw.tf**
-```terraform
+```terraform {filename=lan-wired-sw.tf}
 resource "routeros_ip_dns" "dns" {
   allow_remote_requests = true
 }
@@ -1249,8 +1228,7 @@ resource "routeros_dhcp_client" "dhcp-client" {
 
 Create VLAN interfaces on the bridge for network segmentation:
 
-**vlans.tf**
-```terraform
+```terraform {filename=vlans.tf}
 resource "routeros_interface_vlan" "vlan" {
   interface = routeros_interface_bridge.bridge.name
   for_each = var.vlans
@@ -1262,8 +1240,8 @@ resource "routeros_interface_vlan" "vlan" {
 #### Wireless Access Point Configuration
 
 To configure this device as a controlled access point (CAP) managed by our CAPsMAN controller, we first need to obtain certificates for secure communication:
-**cap.tf**
-```terraform
+
+```terraform {filename=cap.tf}
 data "routeros_ip_addresses" "mgmtip" {
 
 }
@@ -1280,8 +1258,8 @@ resource "routeros_system_certificate" "cap" {
 ```
 
 With certificates configured, we can now set up the controlled access point functionality:
-**cap.tf**
-```terraform
+
+```terraform {filename=cap.tf}
 locals {
   wlans = {
     wlan1 = {
@@ -1304,8 +1282,8 @@ resource "routeros_interface_wireless_cap" "cap" {
 ```
 
 Finally, we'll add the wireless interfaces to the bridge with proper VLAN tagging:
-**bridge.tf**
-```terraform
+
+```terraform {filename=bridge.tf}
 resource "routeros_interface_bridge_port" "bridge-port-wlan" {
   bridge    = routeros_interface_bridge.bridge.name
 

@@ -21,14 +21,14 @@ Homelab cluster will run Talos linux. Initial configuration and some core module
 ## Initialization
 
 First add required provider to main.tf
-```terraform
+```terraform {filename=main.tf}
 talos = {
   source = "siderolabs/talos"
 }
 ```
 
 And add new module 
-```terraform
+```terraform {filename=main.tf}
 module "talos" {
   source = "./talos"
   nodes = local.cluster-nodes
@@ -39,8 +39,8 @@ module "talos" {
 ## Talos module
 
 Talos module is relatively simple accepting few inputs
-**inputs.tf**
-```terraform
+
+```terraform {filename=input.tf}
 variable "nodes" {
   type = map(object({
     mac = string
@@ -56,8 +56,7 @@ variable "cluster_name" {
 
 And with core implementation
 
-**talos.tf**
-```terraform
+```terraform {filename=talos.tf}
 terraform {
   required_providers {
     talos = {
