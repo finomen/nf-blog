@@ -13,7 +13,6 @@ category = "categories"
     ordered = false
     startLevel = 2
 
-
 [menu]
   [[menu.main]]
     identifier = "home"
@@ -43,3 +42,7 @@ category = "categories"
     icon = "brand-linkedin"
     name = "LinkedIn"
     url = "https://www.linkedin.com/in/nfilchneko/"
+
+[caches]
+  [caches.images]
+    dir = ':cacheDir/images'
