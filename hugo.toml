@@ -1,0 +1,45 @@
+baseURL = 'https://blog.finomen.net/'
+languageCode = 'en-us'
+title = 'Finomen Blog'
+theme = 'm10c'
+
+[taxonomies]
+tag = "tags"
+category = "categories"
+
+[markup]
+  [markup.tableOfContents]
+    endLevel = 3
+    ordered = false
+    startLevel = 2
+
+
+[menu]
+  [[menu.main]]
+    identifier = "home"
+    name = "Home"
+    url = "/"
+    weight = 1
+  [[menu.main]]
+    identifier = "tags"
+    name = "Tags"
+    url = "/tags/"
+    weight = 2
+  [[menu.main]]
+    identifier = "categories"
+    name = "Categories"
+    url = "/categories/"
+    weight = 2
+
+[params]
+  author = "Nikolai"
+  description = "Homelab blog"
+  menu_item_separator = " - "
+  [[params.social]]
+    icon = "brand-github"
+    name = "Github"
+    url = "https://github.com/finomen"
+   [[params.socialIcons]]
+    icon = "brand-linkedin"
+    name = "LinkedIn"
+    url = "https://www.linkedin.com/in/nfilchneko/"
