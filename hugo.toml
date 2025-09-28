@@ -9,7 +9,7 @@ category = "categories"
 
 [markup]
   [markup.tableOfContents]
-    endLevel = 3
+    endLevel = 4
     ordered = false
     startLevel = 2
 
@@ -38,7 +38,7 @@ category = "categories"
     icon = "brand-github"
     name = "Github"
     url = "https://github.com/finomen"
-   [[params.socialIcons]]
+  [[params.socialIcons]]
     icon = "brand-linkedin"
     name = "LinkedIn"
     url = "https://www.linkedin.com/in/nfilchneko/"
