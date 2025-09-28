@@ -1,6 +1,6 @@
 +++
 date = '2025-09-27T22:04:12+02:00'
-draft = true
+draft = false
 title = '[Homelab] Network'
 tags = ['opentofu', 'mikrotik', 'network']
 categories = ['homelab']    
@@ -13,31 +13,51 @@ This is part of the [Homelab](/categories/homelab/) series. Please read disclaim
 {{< toc >}}
 
 ## Hardware
-- Router [Mikrotik CRS310-1G-5S-4S+IN](https://mikrotik.com/product/crs310_1g_5s_4s_in) will be referred as `edge-router`
-- Switch [HORACO 10Gb SFP+ 8 Ports](https://de.aliexpress.com/item/1005006765378093.html) will be referred as `lan-wifi`
-- WiFi Router [Mikrotik hAP ac](https://mikrotik.com/product/RB962UiGS-5HacT2HnT) will be referred as `lan-wired-sw`
-- WiFi Router [Tp-Link Archer BE800](https://www.tp-link.com/us/home-networking/wifi-router/archer-be800/) will be referred as `rack-10G`
+- Router [Mikrotik CRS310-1G-5S-4S+IN](https://mikrotik.com/product/crs310_1g_5s_4s_in) — 10G-capable RouterOS switch used as the edge gateway (routing, VLANs, DHCP, firewall); will be referred to as `edge-router`.
+- Switch [HORACO 10Gb SFP+ 8 Ports](https://de.aliexpress.com/item/1005006765378093.html) — fanless 8×SFP+ Layer 2 aggregation switch for rack/backbone connectivity; will be referred to as `rack-10G`.
+- WiFi Router [Mikrotik hAP ac](https://mikrotik.com/product/RB962UiGS-5HacT2HnT) — dual‑band 802.11ac AP with 5×GbE + 1×SFP; used as a managed AP and small wired switch; will be referred to as `lan-wired-sw`.
+- WiFi Router [Tp-Link Archer BE800](https://www.tp-link.com/us/home-networking/wifi-router/archer-be800/) — Wi‑Fi 7 router with 10G uplink; used as the main LAN Wi‑Fi AP in bridge/AP mode; will be referred to as `lan-wifi`.
 
 TODO: diagram
 
 ## Configuration
 
-All configuration will be done using [OpenTofu](https://opentofu.org/). 
+All configuration will be done using [OpenTofu](https://opentofu.org/), an open-source infrastructure as code (IaC) tool that's a fork of Terraform. OpenTofu allows us to define and manage our network infrastructure as code, providing version control, repeatability, and automation.
 
-State will be stored in [Google Cloud Storage](https://cloud.google.com/storage?hl=en). Free quota is more than enough.
+Configuration management of the Mikrotik is handled through the [Terraform RouterOS Provider](https://registry.terraform.io/providers/terraform-routeros/routeros/latest/docs), which enables declarative management of RouterOS devices via their REST API. This provider supports all major RouterOS features including interfaces, routing, firewall rules, DHCP configuration, and wireless settings.
 
-Secrets will be stored in [Google Secret Manager](https://cloud.google.com/security/products/secret-manager?hl=en). Fre quota allows only 6 secrets, but they could contain JSON.
+### Why OpenTofu?
+- **Declarative**: Define the desired state of your infrastructure
+- **Version Control**: Track changes to your network configuration over time
+- **Reproducibility**: Recreate identical environments reliably
+- **State Management**: Track resource relationships and dependencies
+- **Open Source**: Community-driven development with no vendor lock-in
 
+### State Management
+State will be stored in [Google Cloud Storage](https://cloud.google.com/storage?hl=en) using the [GCS backend](https://opentofu.org/docs/language/settings/backends/gcs/). The free tier provides 5GB of storage, which is more than enough for infrastructure state files. Remote state storage ensures:
+- **Collaboration**: Multiple team members can work with the same state
+- **State Locking**: Prevents concurrent modifications
+- **Backup**: Automatic versioning and backup of state files
+- **Security**: Encrypted storage and access control
+
+### Secret Management
+Secrets will be stored in [Google Secret Manager](https://cloud.google.com/security/products/secret-manager?hl=en), providing secure storage for sensitive configuration data like passwords and certificates. The free tier allows 6 secrets with 10,000 access operations per month, but secrets can contain JSON objects to store multiple values efficiently.
+
+**Security Benefits:**
+- Automatic encryption at rest and in transit
+- Access logging and audit trails  
+- IAM integration for fine-grained access control
+- Automatic secret rotation capabilities
 
 ### Initialization
 
-First, [login to google cloud CLI](https://cloud.google.com/docs/authentication/set-up-adc-local-dev-environment):
+First, [log in to the Google Cloud CLI](https://cloud.google.com/docs/authentication/set-up-adc-local-dev-environment) to set up Application Default Credentials for local development:
 
 ```bash
 gcloud auth application-default login
 ```
 
-After create `main.tf` file with required providers and backend
+Next, create a `main.tf` file with required providers and backend:
 
 ```terraform
 terraform {
@@ -56,7 +76,7 @@ terraform {
 }
 ```
 
-And `variables.tf` with required input variables
+And a `variables.tf` file with required input variables:
 
 ```terraform
 variable "state_bucket" {
@@ -75,7 +95,7 @@ variable "google_project" {
 }
 ```
 
-Variables could be passed via command line or with `all.auto.tfvars` file:
+Variables can be passed via command line or with an `all.auto.tfvars` file:
 
 ```terraform
 google_project = "<redacted>"
@@ -88,21 +108,23 @@ Now call
 tofu init
 ```
 
-### Prepare hardware
+### Prepare Hardware
 
-To be able to apply configuration, few preparation steps required:
+Before applying OpenTofu configuration, the MikroTik devices need initial preparation. This ensures clean configuration without conflicts from default settings.
 
-1. Reset mikrotik routers to factory settings without defconf
+1. Reset MikroTik routers to factory settings without defconf
 2. Add addresses that will not overlap with future networks:
-   - `edge-router` `192.168.88.1/24` on `ether1` interface
-   - `lan-wired-sw` `192.168.88.2/24` on `sfp1` interface
+   - `edge-router`: `192.168.88.1/24` on `ether1` interface
+   - `lan-wired-sw`: `192.168.88.2/24` on `sfp1` interface
 3. Set admin passwords
 
-### Configuration definition
+### Configuration Definition
 
-First, list managed and unmanaged devices
+#### Device Inventory
 
-**manged-devices.tf**
+First, we'll define our managed and unmanaged devices. Managed devices will have Terraform users created with automatically generated passwords, while unmanaged devices are tracked for static DHCP leases and documentation purposes.
+
+**managed-devices.tf**
 ```terraform
 locals {
   managed-devices = {
@@ -120,7 +142,7 @@ locals {
 }
 ```
 
-**unmanged-devices.tf**
+**unmanaged-devices.tf**
 ```terraform
 locals {
   unmanaged-devices = {
@@ -136,14 +158,16 @@ locals {
 }
 ```
 
-Next, define desired VLANs
+#### VLAN Design
 
-| Id   | Name     | Network         | Purpose                                                   | 
+Next, we'll define our desired VLANs. This segmented approach provides network isolation, security boundaries, and organized traffic management across different device categories.
+
+| ID   | Name     | Network         | Purpose                                                   | 
 |------|----------|-----------------|-----------------------------------------------------------|
 | 10   | mgmt     | 192.168.10.0/24 | Management and interaction between network infrastructure |
-| 20   | lan      | 192.168.20.0/24 | Home netowrk                                              |
+| 20   | lan      | 192.168.20.0/24 | Home network                                              |
 | 30   | iot      | 192.168.30.0/24 | Network for IoT devices                                   |
-| 100  | cluster  | 10.100.0.0/24   | Netowrk for kubernetes clusterr nodes                     |
+| 100  | cluster  | 10.100.0.0/24   | Network for Kubernetes cluster nodes                     |
 
 **vlans.tf**
 ```terraform
@@ -173,7 +197,9 @@ locals {
 }
 ```
 
-And cluster nodes
+#### Cluster Nodes
+
+Next, we'll define our Kubernetes cluster nodes with their MAC addresses and IP assignments for consistent network identification:
 
 **cluster.tf**
 ```terraform
@@ -198,7 +224,9 @@ locals {
 }
 ```
 
-And wifi for IoT device
+#### WiFi Configuration
+
+Finally, we'll configure WiFi networks for IoT devices using CAPsMAN (Controlled Access Point system MANager):
 **wifi-capsman.tf**
 ```terraform
 locals {
@@ -225,11 +253,11 @@ locals {
 ```
 
 
-### Create secrets
+### Create Secrets
 
-To managed devices, terraform user will be created with password stored in Google secret manager.
+For managed devices, Terraform users will be created with passwords stored in Google Secret Manager.
 
-To do this we need one more input variable in variables.tf
+To do this, we need one more input variable in `variables.tf`:
 ```terraform
 variable "google_project" {
   type = string
@@ -241,7 +269,7 @@ And value in `all.auto.tfvars`
 google_project = "<redacted>"
 ```
 
-And one more provider in `main.tf` to generate random passwords
+And one more provider in `main.tf` to generate random passwords:
 ```terraform
     random = {
       source  = "hashicorp/random"
@@ -250,7 +278,7 @@ And one more provider in `main.tf` to generate random passwords
 
 #### secrets.tf
 
-First, create password for every managed device
+This section handles the creation and storage of sensitive configuration data. First, we'll create random passwords for every managed device:
 ```terraform
 resource "random_password" "device_password" {
   length = 32
@@ -259,7 +287,7 @@ resource "random_password" "device_password" {
 } 
 ```
 
-Next, save all in google secret manager using json
+Next, we'll save all passwords in Google Secret Manager using JSON format for efficient storage within the free tier limits:
 ```terraform
 resource "google_secret_manager_secret" "device-accounts" {
   secret_id = "tf_device-accounts"
@@ -293,7 +321,7 @@ locals {
 }
 ```
 
-Repeat for Wi-Fi passwords
+We'll repeat the same process for Wi-Fi passwords:
 
 ```terraform
 
@@ -328,9 +356,9 @@ locals {
 }
 ```
 
-### Edge router
+### Edge Router Configuration
 
-To configure edge router let's create `edge-router` module and include it
+The edge router serves as our network gateway, handling internet connectivity, VLAN routing, DHCP services, firewall rules, and wireless management through CAPsMAN. Let's create an `edge-router` module to organize this complex configuration:
 
 **main.tf**
 ```terraform
@@ -381,7 +409,9 @@ And add provider to main.tf
     }
 ```
 
-#### Edge router module
+#### Edge Router Module
+
+This module contains all the configuration for our primary network gateway, implementing VLANs, bridge configuration, DHCP services, wireless management, and security policies.
 
 **edge.tf**
 ```terraform
@@ -470,7 +500,9 @@ tofu apply
 
 Now we will be able to use our created account for edge-router.
 
-First, let's create VLAN's 
+#### VLAN Creation
+
+First, let's create our VLANs on the bridge interface:
 
 **vlans.tf**
 ```terraform
@@ -493,7 +525,9 @@ resource "routeros_interface_vlan" "vlan" {
 
 ```
 
-Now we could setup bridge and configure ports
+#### Bridge and Port Configuration
+
+Now we'll set up the bridge interface and configure individual ports. The bridge enables VLAN switching and connects all network segments. Each port is configured with appropriate VLAN tagging based on its purpose:
 **bridge.tf**
 ```terraform
 locals {
@@ -587,7 +621,9 @@ resource "routeros_interface_bridge_vlan" "bridge-vlan" {
 }
 ```
 
-And uplink
+#### Uplink Configuration
+
+The uplink configuration handles our internet connection through the WAN interface, including DHCP client setup for IPv4 and IPv6, NAT configuration, and interface lists for firewall rules:
 **uplink.tf**
 ```terraform
 resource "routeros_interface_ethernet" "wan" {
@@ -641,7 +677,9 @@ resource "routeros_ip_firewall_nat" "wan-srcnat" {
 
 Since there is no firewall configured yet, it's better to keep uplink cable unplugged.
 
-Now it's time to configure DHCP and addresses. Because there are many resources to be configured for every network, let's move them into separate module and include for all networks
+#### DHCP and Network Configuration
+
+Now we'll configure DHCP services and IP addressing for each VLAN. Since there are many resources to configure for every network (IP addresses, DHCP pools, servers, and IPv6 settings), we'll create a reusable module and apply it to all VLANs:
 
 **dhcp-nets.tf**
 ```terraform
@@ -663,7 +701,7 @@ module "mikrotik-dhcp-net" {
 
 ```
 
-Now we could add static leases for known devices
+With DHCP networks configured, we can now add static leases for known devices to ensure consistent IP assignments:
 **dhcp-static.tf**
 ```terraform
 resource "routeros_dhcp_server_lease" "static-lease" {
@@ -674,7 +712,9 @@ resource "routeros_dhcp_server_lease" "static-lease" {
 }
 ```
 
-To keep time in sync we need NTP-client too
+#### NTP Configuration
+
+To maintain accurate time synchronization across the network (essential for logs, certificates, and security), we'll configure an NTP client:
 **ntp.tf**
 ```terraform
 resource "routeros_system_ntp_client" "ntp" {
@@ -689,7 +729,9 @@ resource "routeros_system_ntp_client" "ntp" {
 }
 ```
 
-To configure WiFi with CAPsMAN, we need certificates: 
+#### CAPsMAN Configuration
+
+CAPsMAN (Controlled Access Point system MANager) provides centralized wireless management for our MikroTik access points. First, we need to set up certificates for secure communication between the controller and access points:
 
 **cert.tf**
 ```terraform
@@ -707,7 +749,7 @@ resource "routeros_system_certificate_scep_server" "edge-ca" {
 }
 ```
 
-And now we can setup out CAPsMAN:
+With certificates in place, we can now configure the CAPsMAN controller, wireless channels, security profiles, and provisioning rules:
 
 **capsman.tf**
 ```terraform
@@ -804,9 +846,9 @@ resource "routeros_capsman_manager_interface" "bridge" {
 }
 ```
 
-##### Firewall
+#### Firewall Configuration
 
-Let's setup very basic firewall to be able to use internet in our network
+Now we'll configure a basic but secure firewall ruleset. This includes allowing established connections, dropping invalid packets, accepting ICMP for network troubleshooting, and implementing proper NAT for internet access while blocking unwanted inbound traffic:
 
 **firewall.tf**
 ```terraform
@@ -903,7 +945,7 @@ resource "routeros_ip_firewall_filter" "drop_all_wan_not_dstnat" {
 }
 ```
 
-And for ipv6
+We'll also configure similar rules for IPv6 traffic:
 
 **firewallv6.tf**
 ```terraform
@@ -954,7 +996,9 @@ resource "routeros_ipv6_firewall_filter" "drop_invalid_forward" {
 }
 ```
 
-#### mikrotik-dhcp-net module
+#### MikroTik DHCP Network Module
+
+This reusable module handles the complete network setup for a VLAN, including IP addressing, DHCP pool creation, server configuration, and IPv6 setup. It standardizes network configuration across all VLANs:
 
 **input.tf**
 ```terraform
@@ -1047,9 +1091,9 @@ resource "routeros_ipv6_address" "addr-v6" {
 }
 ```
 
-### lan-wired-sw
+### LAN Wired Switch Configuration
 
-Now we could start to configure second device.
+Now we can configure our second MikroTik device, which serves as a managed access point and provides additional wired ports for the LAN. This device connects to the edge router via trunk and provides both wireless and wired access:
 
 **main.tf**
 ```terraform
@@ -1063,7 +1107,13 @@ module "lan-wired-sw" {
 }
 ```
 
-### lan-wired-sw module
+#### LAN Wired Switch Module
+
+This module configures the secondary MikroTik device as a managed switch and wireless access point, handling VLAN trunking from the edge router and providing local network access:
+
+#### Basic Network Services
+
+Next, we'll configure basic network services including DNS forwarding, IPv6 settings, and DHCP client for management connectivity:
 
 **lan-wired-sw.tf**
 ```terraform
@@ -1086,7 +1136,9 @@ variable "capsman" {
 
 First, use the same steps and `tf-account.tf` file.
 
-Next, let's configure basic network
+#### Bridge and Port Configuration
+
+First, we'll configure the bridge and port assignments. This device acts as a VLAN-aware switch, with most ports providing untagged LAN access while the uplink carries multiple VLANs:
 
 **bridge.tf**
 ```terraform
@@ -1193,6 +1245,10 @@ resource "routeros_dhcp_client" "dhcp-client" {
 }
 ```
 
+#### VLAN Interface Creation
+
+Create VLAN interfaces on the bridge for network segmentation:
+
 **vlans.tf**
 ```terraform
 resource "routeros_interface_vlan" "vlan" {
@@ -1203,7 +1259,9 @@ resource "routeros_interface_vlan" "vlan" {
 }
 ```
 
-Now to configure Wi-Fi we need to add certificates
+#### Wireless Access Point Configuration
+
+To configure this device as a controlled access point (CAP) managed by our CAPsMAN controller, we first need to obtain certificates for secure communication:
 **cap.tf**
 ```terraform
 data "routeros_ip_addresses" "mgmtip" {
@@ -1221,7 +1279,7 @@ resource "routeros_system_certificate" "cap" {
 }
 ```
 
-After it we could add CAPs
+With certificates configured, we can now set up the controlled access point functionality:
 **cap.tf**
 ```terraform
 locals {
@@ -1245,7 +1303,7 @@ resource "routeros_interface_wireless_cap" "cap" {
 }
 ```
 
-And add WLANs to the bridge
+Finally, we'll add the wireless interfaces to the bridge with proper VLAN tagging:
 **bridge.tf**
 ```terraform
 resource "routeros_interface_bridge_port" "bridge-port-wlan" {
@@ -1259,9 +1317,12 @@ resource "routeros_interface_bridge_port" "bridge-port-wlan" {
 }
 ```
 
+### HORACO Switch
+
+Unfortunately, there is no provider compatible with this switch. For now, switch is configured to have port 1 to be trunk and all other ports access ports of the VLAN 100.
+
 ## Cleanup
 
-Only thing left is to remove temporary IPs added for initial configuration and plug in uplink.
-
+The only thing left is to remove the temporary IPs added for initial configuration and plug in the uplink cable.
 
 

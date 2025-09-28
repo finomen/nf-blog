@@ -11,6 +11,7 @@ categories = ['homelab']
 - Not for production: Do not use any information, configurations, or examples from this blog in production environments. Always validate against official vendor documentation, test in a non‑production lab, and apply your organization’s standards and change controls.
 - No warranty or liability: All content is provided without any warranties or guarantees of any kind. By using any information here, you accept full responsibility and risk. I am not liable for any loss, damage, downtime, security incidents, compliance issues, data loss, or costs arising from the use or misuse of this content.
 - Free use for all: You are free to use, adapt, and share the information in this blog for any purpose. Attribution is appreciated but not required.
+- Content may include parts generated or edited with Generative AI models
 
 ## Contents
 
