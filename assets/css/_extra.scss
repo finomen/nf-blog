@@ -3,12 +3,12 @@
 }
 
 .code-filename {
-  background-color: #2d3748;
-  color: #e2e8f0;
+  background-color: #1a202c;
+  color: #afbac4;
   padding: 0.5rem 1rem;
   border-top-left-radius: 0.375rem;
   border-top-right-radius: 0.375rem;
-  border-bottom: 1px solid #4a5568;
+  border-bottom: 1px solid #2d3748;
   font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Source Code Pro', monospace;
   font-size: 0.875rem;
   font-weight: 500;
@@ -20,27 +20,17 @@
   margin-right: 0.25rem;
 }
 
+.code-filename-terraform .filename-text::before {
+  content: url("https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/opentofu.svg");
+  margin-right: 0.25rem;
+  height: 15px;
+  width: 15px;
+  display: inline-block;
+}
+
 .code-block-wrapper .highlight,
 .code-block-wrapper pre {
   margin-top: 0 !important;
   border-top-left-radius: 0 !important;
   border-top-right-radius: 0 !important;
-}
-
-/* Dark theme support - adjust colors for your theme */
-@media (prefers-color-scheme: dark) {
-  .code-filename {
-    background-color: #1a202c;
-    color: #f7fafc;
-    border-bottom-color: #2d3748;
-  }
-}
-
-/* Light theme support - adjust colors for your theme */
-@media (prefers-color-scheme: light) {
-  .code-filename {
-    background-color: #f7fafc;
-    color: #2d3748;
-    border-bottom-color: #e2e8f0;
-  }
 }

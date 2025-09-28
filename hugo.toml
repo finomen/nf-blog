@@ -34,7 +34,6 @@ category = "categories"
   author = "Nikolai"
   description = "Homelab blog"
   menu_item_separator = " - "
-  custom_css = ["css/custom-code-blocks.css"]
   [[params.social]]
     icon = "brand-github"
     name = "Github"

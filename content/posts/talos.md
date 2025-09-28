@@ -18,6 +18,16 @@ Previous part is [Network](/posts/network/)
 
 Homelab cluster will run Talos linux. Initial configuration and some core modules will be configured from the same terraform project as networking. I've found another post about [talos configuration on proxmox](https://olav.ninja/talos-cluster-on-proxmox-with-terraform) which was very helpful.
 
+## Hardware
+
+Nodes hardware is not exactly same, but all nodes are:
+- Are based on Intel CPU
+- Do not have any video output
+- Have 10G SFP+ network interface
+- Have two NVMe drives - 1Tb for system and local storage and 2Tb for CEPH
+
+In more details hardware will be described later, when I'll make permanent housing for them
+
 ## Initialization
 
 First add required provider to main.tf
@@ -148,3 +158,77 @@ output "kubeconfig" {
   sensitive = true
 }
 ```
+
+There are few patches mentioned in this configuration:
+
+```yaml {filename=files/cluster-ips.yaml}
+cluster:
+  network:
+    podSubnets:
+      - 10.244.0.0/16
+      - 2001:db8:42:0::/56
+    serviceSubnets:
+      - 10.243.0.0/16
+      - 2001:db8:42:1::/112
+```
+```yaml {filename=files/cluster-name.yaml}
+cluster:
+  clusterName: homelab.finomen.net
+  network:
+    dnsDomain: homelab.finomen.net
+```
+```yaml {filename=files/cp-scheduling.yaml}
+cluster:
+  allowSchedulingOnControlPlanes: true
+```
+```yaml {filename=files/max_map_count.yaml}
+cluster:
+  network:
+    cni:
+      name: none
+  proxy:
+    disabled: true
+```
+```yaml {filename=files/disable-kube-proxy-and-cni.yaml}
+machine:
+  sysctls:
+    vm.max_map_count: 262144
+```
+```yaml {filename=files/multihome.yaml}
+machine:
+  kubelet:
+    nodeIP:
+      validSubnets:
+        - 10.100.0.0/24
+        #- "fd12:3456:789a:1::/64"
+cluster:
+  etcd:
+    advertisedSubnets:
+      - 10.100.0.0/24
+      #- "fd12:3456:789a:1::/64"
+```
+
+And templates
+
+```yaml {filename=install-disk-and-hostname.yaml.tmpl}
+machine:
+  install:
+    disk: ${install_disk}
+  network:
+    hostname: ${hostname}
+  certSANs:
+  - ${ip}
+  - ${name}
+```
+
+## Bootstrap
+
+First, download and write to USB-sticks latest ISO from [Talos Downloads](https://www.talos.dev/v1.11/talos-guides/install/bare-metal-platforms/iso/) and plug them into all nodes.
+
+Next, call 
+
+```bash
+tofu apply
+```
+
+And wait. Bootstrap may take a while

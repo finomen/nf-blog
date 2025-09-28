@@ -1,9 +1,10 @@
 {{ $lang := .Type | default "text" }}
 {{ $filename := .Attributes.filename | default .Attributes.title }}
 
+
 <div class="code-block-wrapper">
   {{ if $filename }}
-  <div class="code-filename">
+  <div class="code-filename code-filename-{{ $lang }}">
     <span class="filename-text">{{ $filename }}</span>
   </div>
   {{ end }}

@@ -78,7 +78,7 @@ terraform {
 
 And a `variables.tf` file with required input variables:
 
-```terraform {fielname=variables.tf}
+```terraform {filename=variables.tf}
 variable "state_bucket" {
   type = string
   description = "Bucket to store state"
