@@ -1,6 +1,6 @@
 +++
 date = '2025-09-27T22:03:21+02:00'
-draft = true
+draft = false
 title = '[Homelab] Intro'
 categories = ['homelab'] 
 +++
