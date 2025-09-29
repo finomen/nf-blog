@@ -161,7 +161,7 @@ output "kubeconfig" {
 
 There are few patches mentioned in this configuration:
 
-```yaml {filename=files/cluster-ips.yaml}
+```yaml {filename="files/cluster-ips.yaml"}
 cluster:
   network:
     podSubnets:
@@ -171,17 +171,18 @@ cluster:
       - 10.243.0.0/16
       - 2001:db8:42:1::/112
 ```
-```yaml {filename=files/cluster-name.yaml}
+
+```yaml {filename="files/cluster-name.yaml"}
 cluster:
   clusterName: homelab.finomen.net
   network:
     dnsDomain: homelab.finomen.net
 ```
-```yaml {filename=files/cp-scheduling.yaml}
+```yaml {filename="files/cp-scheduling.yaml"}
 cluster:
   allowSchedulingOnControlPlanes: true
 ```
-```yaml {filename=files/max_map_count.yaml}
+```yaml {filename="files/max_map_count.yaml"}
 cluster:
   network:
     cni:
@@ -189,28 +190,15 @@ cluster:
   proxy:
     disabled: true
 ```
-```yaml {filename=files/disable-kube-proxy-and-cni.yaml}
+```yaml {filename="files/disable-kube-proxy-and-cni.yaml"}
 machine:
   sysctls:
     vm.max_map_count: 262144
 ```
-```yaml {filename=files/multihome.yaml}
-machine:
-  kubelet:
-    nodeIP:
-      validSubnets:
-        - 10.100.0.0/24
-        #- "fd12:3456:789a:1::/64"
-cluster:
-  etcd:
-    advertisedSubnets:
-      - 10.100.0.0/24
-      #- "fd12:3456:789a:1::/64"
-```
 
 And templates
 
-```yaml {filename=install-disk-and-hostname.yaml.tmpl}
+```yaml {filename="templates/install-disk-and-hostname.yaml.tmpl"}
 machine:
   install:
     disk: ${install_disk}
@@ -219,7 +207,24 @@ machine:
   certSANs:
   - ${ip}
   - ${name}
+  nodeLabels:
+    cilium-enable-bgp: true
 ```
+
+```yaml {filename="templates/multihome.yaml.tmpl"}
+machine:
+  kubelet:
+    nodeIP:
+      validSubnets:
+        - ${cluster_net}
+        #- "fd12:3456:789a:1::/64"
+cluster:
+  etcd:
+    advertisedSubnets:
+      - ${cluster_net}
+      #- "fd12:3456:789a:1::/64"
+```
+
 
 ## Bootstrap
 
